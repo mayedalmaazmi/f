@@ -12,65 +12,6 @@ import Autosuggest from "react-autosuggest";
 import AutosuggestHighlightMatch from "autosuggest-highlight/umd/match";
 import AutosuggestHighlightParse from "autosuggest-highlight/umd/parse";
 
-const languages = [
-	{
-		name: "C",
-		year: 1972
-	},
-	{
-		name: "C#",
-		year: 2000
-	},
-	{
-		name: "C++",
-		year: 1983
-	},
-	{
-		name: "Clojure",
-		year: 2007
-	},
-	{
-		name: "Elm",
-		year: 2012
-	},
-	{
-		name: "Go",
-		year: 2009
-	},
-	{
-		name: "Haskell",
-		year: 1990
-	},
-	{
-		name: "Java",
-		year: 1995
-	},
-	{
-		name: "Javascript",
-		year: 1995
-	},
-	{
-		name: "Perl",
-		year: 1987
-	},
-	{
-		name: "PHP",
-		year: 1995
-	},
-	{
-		name: "Python",
-		year: 1991
-	},
-	{
-		name: "Ruby",
-		year: 1995
-	},
-	{
-		name: "Scala",
-		year: 2003
-	}
-];
-
 function escapeRegexCharacters(str) {
 	return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -178,7 +119,72 @@ class Search extends React.Component {
 	}
 }
 
-ReactGA.initialize("UA-151171782-1"); // Here we should use our GA id
+ReactGA.initialize("UA-152416558-1"); // Here we should use our GA id
+
+class Edit extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = { data: {} };
+	}
+
+	async componentDidMount() {
+		const { data } = await axios(
+			`https://unmarred-utahceratops.glitch.me/manga/${this.props.id}`
+		);
+
+		// save value of last
+		let arr = localStorage.getItem("history") ? JSON.parse(localStorage.getItem("history")) : [];
+		let bol = arr.some(item => item.title === data.title)
+		
+		if (!bol) arr.unshift(data)
+		if(arr.length > 10) arr.length = 10;
+
+		localStorage.setItem('history',JSON.stringify(arr));
+		this.setState({ data });
+	}
+
+	async componentDidUpdate(prevProps) {
+		if (this.props.id !== prevProps.id) {
+			const { data } = await axios(
+				`https://unmarred-utahceratops.glitch.me/manga/${this.props.id}`
+			);
+			this.setState({ data });
+		}
+	}
+
+	render() {
+		const { data } = this.state;
+		return (
+			<div>
+				<Helmet>
+					<title>{data.title}</title>
+				</Helmet>
+				<img src={data.img} style={{ maxWidth: "100%" }} />
+				<div>
+					عنوان المانجا
+					<input type="text" value={data.title} name="title" />
+				</div>
+				<div>عدد الفصول: <input type="number"  name="ch_number" value={data.ch_number}/></div>
+				<div>عدد المجلدات: <input type="number" name="vol_number" value={data.vol_number}/></div>
+				
+				<div>
+					الصنف: {data.genres && data.genres.map(genre => genre)}
+				</div>
+				<h3>الفصول</h3>
+				<ul>
+					{data.chapters &&
+						data.chapters.map(chapter => (
+							<li>
+								<Link to={`/c/${chapter._id}`}>
+									{chapter.title}
+								</Link>
+							</li>
+						))}
+				</ul>
+			</div>
+		);
+	}
+}
 
 class Chapter extends React.Component {
 	constructor(props) {
@@ -282,6 +288,7 @@ class List extends React.Component {
 	}
 
 	render() {
+		console.log(JSON.parse(localStorage.getItem("history")))
 		return (
 			<div>
 				{this.state.loading ? (
@@ -291,14 +298,20 @@ class List extends React.Component {
 							src="https://media.giphy.com/media/ucY7FE8F0IysM/giphy.gif"
 						/>
 						<br />
-						Loading
+						Loading...
 					</div>
 				) : (
 					""
 				)}
-
-				{this.state.data ? (
+				{localStorage.getItem("history") && <div>
+					<h2>آخر 10 مانجا قمت بزيارتها</h2>
+					<ul>
+					{JSON.parse(localStorage.getItem("history")).map(j=><li><Link style={{display: "flex", alignItems: "", marginBottom: "20px"}} to={j._id}>{j.title}</Link></li>)}
+					</ul>
+				</div>}
+				{this.state.data.length !== 0 ? (
 					<div>
+						<h2>قائمة المانجا</h2>
 						<ol>
 							{this.state.data.sort().map(data1 => (
 								<li key={data1._id}>
@@ -325,6 +338,15 @@ class MangaPage extends React.Component {
 		const { data } = await axios(
 			`https://unmarred-utahceratops.glitch.me/manga/${this.props.id}`
 		);
+
+		// save value of last
+		let arr = localStorage.getItem("history") ? JSON.parse(localStorage.getItem("history")) : [];
+		let bol = arr.some(item => item.title === data.title)
+		
+		if (!bol) arr.unshift(data)
+		if(arr.length > 10) arr.length = 10;
+
+		localStorage.setItem('history',JSON.stringify(arr));
 		this.setState({ data });
 	}
 
@@ -344,12 +366,14 @@ class MangaPage extends React.Component {
 				<Helmet>
 					<title>{data.title}</title>
 				</Helmet>
+				<Link to={`/edit/${this.props.id}`}>تعديل</Link>
 				<img src={data.img} style={{ maxWidth: "100%" }} />
 				<div>
 					<h2>{data.title}</h2>
 				</div>
 				<div>عدد الفصول: {data.ch_number}</div>
 				<div>عدد المجلدات: {data.vol_number}</div>
+				
 				<div>
 					الصنف: {data.genres && data.genres.map(genre => genre)}
 				</div>
@@ -380,6 +404,8 @@ const Main = ({ children }) => (
 		}}
 	</Location>
 );
+
+
 const App = () => (
 	<Layout>
 		<Search />
@@ -387,6 +413,7 @@ const App = () => (
 			<MangaPage path="/:id" />
 			<List path="/" />
 			<Chapter path="/c/:id" />
+			<Edit path="/edit/:id" />
 		</Router>
 	</Layout>
 );
